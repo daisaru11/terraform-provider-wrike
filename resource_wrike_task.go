@@ -99,29 +99,110 @@ func resourceTask() *schema.Resource {
 	}
 }
 
-func resourceTaskCreate(d *schema.ResourceData, meta interface{}) error {
-	client := meta.(*wrike.Client)
-
+func buildCreateTaskRequest(d *schema.ResourceData) (*wrike.CreateTaskRequest, error) {
 	var folderID string
-	if attr, ok := d.GetOk("parent_ids"); ok {
-		parentIds := attr.([]string)
+	if attr, ok := d.GetOk("parents"); ok {
+		parentIds := attr.([]interface{})
 		if len(parentIds) > 0 {
-			folderID = parentIds[0]
+			folderID = parentIds[0].(string)
 		}
 	}
 
 	if folderID == "" {
-		return fmt.Errorf("One or more parent folder IDs are required")
+		return nil, fmt.Errorf("One or more parent folder IDs are required")
 	}
 
 	payload := wrike.CreateTaskPayload{}
 
-	req := wrike.CreateTaskRequest{
-		FolderID: wrike.String(folderID),
-		Payload:  &payload,
+	if attr, ok := d.GetOk("title"); ok {
+		payload.Title = wrike.String(attr.(string))
 	}
 
-	res, err := client.CreateTask(&req)
+	if attr, ok := d.GetOk("description"); ok {
+		payload.Description = wrike.String(attr.(string))
+	}
+
+	if attr, ok := d.GetOk("status"); ok {
+		payload.Status = wrike.String(attr.(string))
+	}
+
+	if attr, ok := d.GetOk("importance"); ok {
+		payload.Importance = wrike.String(attr.(string))
+	}
+
+	if attr, ok := d.GetOk("dates"); ok {
+		dates := attr.(map[string]interface{})
+		payload.Dates = &wrike.TaskDates{}
+
+		if v, ok := dates["type"]; ok {
+			payload.Dates.Type = wrike.String(v.(string))
+		}
+		if v, ok := dates["duration"]; ok {
+			payload.Dates.Duration = wrike.Int(v.(int))
+		}
+		if v, ok := dates["start"]; ok {
+			payload.Dates.Start = wrike.String(v.(string))
+		}
+		if v, ok := dates["due"]; ok {
+			payload.Dates.Due = wrike.String(v.(string))
+		}
+		if v, ok := dates["work_on_weekends"]; ok {
+			payload.Dates.WorkOnWeekends = wrike.Bool(v.(bool))
+		}
+	}
+
+	if attr, ok := d.GetOk("parents"); ok {
+		payload.Parents = []string{}
+		for _, v := range attr.([]interface{}) {
+			payload.Parents = append(payload.Parents, v.(string))
+		}
+	}
+
+	if attr, ok := d.GetOk("responsibles"); ok {
+		payload.Responsibles = []string{}
+		for _, v := range attr.([]interface{}) {
+			payload.Responsibles = append(payload.Responsibles, v.(string))
+		}
+	}
+
+	if attr, ok := d.GetOk("super_tasks"); ok {
+		payload.SuperTasks = []string{}
+		for _, v := range attr.([]interface{}) {
+			payload.SuperTasks = append(payload.SuperTasks, v.(string))
+		}
+	}
+
+	if attr, ok := d.GetOk("custom_fields"); ok {
+		payload.CustomFields = []wrike.TaskCustomField{}
+
+		for _, v := range attr.([]interface{}) {
+			m := v.(map[string]string)
+			payload.CustomFields = append(payload.CustomFields, wrike.TaskCustomField{
+				ID:    wrike.String(m["id"]),
+				Value: wrike.String(m["value"]),
+			})
+		}
+	}
+
+	if attr, ok := d.GetOk("custom_status"); ok {
+		payload.CustomStatus = wrike.String(attr.(string))
+	}
+
+	return &wrike.CreateTaskRequest{
+		FolderID: wrike.String(folderID),
+		Payload:  &payload,
+	}, nil
+}
+
+func resourceTaskCreate(d *schema.ResourceData, meta interface{}) error {
+	client := meta.(*wrike.Client)
+
+	req, err := buildCreateTaskRequest(d)
+	if err != nil {
+		return err
+	}
+
+	res, err := client.CreateTask(req)
 	if err != nil {
 		return fmt.Errorf("Failure on creating task: %s", err.Error())
 	}
