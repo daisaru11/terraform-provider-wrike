@@ -63,17 +63,17 @@ func resourceTask() *schema.Resource {
 				},
 			},
 			"parents": &schema.Schema{
-				Type:     schema.TypeList,
+				Type:     schema.TypeSet,
 				Required: true,
 				Elem:     &schema.Schema{Type: schema.TypeString},
 			},
 			"responsibles": &schema.Schema{
-				Type:     schema.TypeList,
+				Type:     schema.TypeSet,
 				Optional: true,
 				Elem:     &schema.Schema{Type: schema.TypeString},
 			},
 			"super_tasks": &schema.Schema{
-				Type:     schema.TypeList,
+				Type:     schema.TypeSet,
 				Optional: true,
 				Elem:     &schema.Schema{Type: schema.TypeString},
 			},
@@ -104,9 +104,9 @@ func resourceTask() *schema.Resource {
 func buildCreateTaskRequest(d *schema.ResourceData) (*wrike.CreateTaskRequest, error) {
 	var folderID string
 	if attr, ok := d.GetOk("parents"); ok {
-		parentIds := attr.([]interface{})
+		parentIds := expandStringSet(attr.(*schema.Set))
 		if len(parentIds) > 0 {
-			folderID = parentIds[0].(string)
+			folderID = parentIds[0]
 		}
 	}
 
@@ -154,24 +154,15 @@ func buildCreateTaskRequest(d *schema.ResourceData) (*wrike.CreateTaskRequest, e
 	}
 
 	if attr, ok := d.GetOk("parents"); ok {
-		payload.Parents = []string{}
-		for _, v := range attr.([]interface{}) {
-			payload.Parents = append(payload.Parents, v.(string))
-		}
+		payload.Parents = expandStringSet(attr.(*schema.Set))
 	}
 
 	if attr, ok := d.GetOk("responsibles"); ok {
-		payload.Responsibles = []string{}
-		for _, v := range attr.([]interface{}) {
-			payload.Responsibles = append(payload.Responsibles, v.(string))
-		}
+		payload.Responsibles = expandStringSet(attr.(*schema.Set))
 	}
 
 	if attr, ok := d.GetOk("super_tasks"); ok {
-		payload.SuperTasks = []string{}
-		for _, v := range attr.([]interface{}) {
-			payload.SuperTasks = append(payload.SuperTasks, v.(string))
-		}
+		payload.SuperTasks = expandStringSet(attr.(*schema.Set))
 	}
 
 	if attr, ok := d.GetOk("custom_fields"); ok {
@@ -201,7 +192,7 @@ func resourceTaskCreate(d *schema.ResourceData, meta interface{}) error {
 
 	req, err := buildCreateTaskRequest(d)
 	if err != nil {
-		return err
+		return fmt.Errorf("Failure on creating task: %s", err.Error())
 	}
 
 	res, err := client.CreateTask(req)
@@ -233,17 +224,110 @@ func resourceTaskRead(d *schema.ResourceData, meta interface{}) error {
 	return applyTaskToResource(d, &res.Data[0])
 }
 
+func buildUpdateTaskRequest(d *schema.ResourceData) (*wrike.UpdateTaskRequest, error) {
+	payload := wrike.UpdateTaskPayload{}
+
+	if d.HasChange("title") {
+		_, attr := d.GetChange("title")
+		payload.Title = wrike.String(attr.(string))
+	}
+
+	if d.HasChange("description") {
+		_, attr := d.GetChange("description")
+		payload.Description = wrike.String(attr.(string))
+	}
+
+	if d.HasChange("status") {
+		_, attr := d.GetChange("status")
+		payload.Status = wrike.String(attr.(string))
+	}
+
+	if d.HasChange("importance") {
+		_, attr := d.GetChange("importance")
+		payload.Importance = wrike.String(attr.(string))
+	}
+
+	if d.HasChange("dates") {
+		attr := d.Get("dates")
+		dates := attr.(map[string]interface{})
+		payload.Dates = &wrike.TaskDates{}
+
+		if v, ok := dates["type"]; ok {
+			payload.Dates.Type = wrike.String(v.(string))
+		}
+		// if v, ok := dates["duration"]; ok {
+		// 	payload.Dates.Duration = wrike.Int(v.(int))
+		// }
+		if v, ok := dates["start"]; ok {
+			payload.Dates.Start = wrike.String(v.(string))
+		}
+		if v, ok := dates["due"]; ok {
+			payload.Dates.Due = wrike.String(v.(string))
+		}
+		if v, ok := dates["work_on_weekends"]; ok {
+			payload.Dates.WorkOnWeekends = wrike.Bool(v.(bool))
+		}
+	}
+
+	if d.HasChange("parents") {
+		old, new := d.GetChange("parents")
+		oldSet := old.(*schema.Set)
+		newSet := new.(*schema.Set)
+
+		if added := newSet.Difference(oldSet); added.Len() > 0 {
+			payload.AddParents = expandStringSet(added)
+		}
+
+		if removed := oldSet.Difference(newSet); removed.Len() > 0 {
+			payload.RemoveParents = expandStringSet(removed)
+		}
+	}
+
+	if d.HasChange("responsibles") {
+		old, new := d.GetChange("responsibles")
+		oldSet := old.(*schema.Set)
+		newSet := new.(*schema.Set)
+
+		if added := newSet.Difference(oldSet); added.Len() > 0 {
+			payload.AddResponsibles = expandStringSet(added)
+		}
+
+		if removed := oldSet.Difference(newSet); removed.Len() > 0 {
+			payload.RemoveResponsibles = expandStringSet(removed)
+		}
+	}
+
+	if d.HasChange("super_tasks") {
+		old, new := d.GetChange("super_tasks")
+		oldSet := old.(*schema.Set)
+		newSet := new.(*schema.Set)
+
+		if added := newSet.Difference(oldSet); added.Len() > 0 {
+			payload.AddSuperTasks = expandStringSet(added)
+		}
+
+		if removed := oldSet.Difference(newSet); removed.Len() > 0 {
+			payload.RemoveSuperTasks = expandStringSet(removed)
+		}
+	}
+
+	return &wrike.UpdateTaskRequest{
+		TaskID:  wrike.String(d.Id()),
+		Payload: &payload,
+	}, nil
+}
+
 func resourceTaskUpdate(d *schema.ResourceData, meta interface{}) error {
 	client := meta.(*wrike.Client)
 
-	req := wrike.UpdateTaskRequest{
-		TaskID:  wrike.String(d.Id()),
-		Payload: &wrike.UpdateTaskPayload{},
+	req, err := buildUpdateTaskRequest(d)
+	if err != nil {
+		return fmt.Errorf("Failure on updating task: %s", err.Error())
 	}
 
-	res, err := client.UpdateTask(&req)
+	res, err := client.UpdateTask(req)
 	if err != nil {
-		return fmt.Errorf("Failure on creating task: %s", err.Error())
+		return fmt.Errorf("Failure on updating task: %s", err.Error())
 	}
 
 	return applyTaskToResource(d, &res.Data[0])
