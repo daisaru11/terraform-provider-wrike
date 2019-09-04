@@ -26,25 +26,27 @@ func resourceTask() *schema.Resource {
 			},
 			"status": &schema.Schema{
 				Type:     schema.TypeString,
+				Default:  "Active",
 				Optional: true,
 			},
 			"importance": &schema.Schema{
 				Type:     schema.TypeString,
+				Default:  "Normal",
 				Optional: true,
 			},
 			"dates": &schema.Schema{
 				Type:     schema.TypeMap,
-				Optional: true,
+				Required: true,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"type": {
 							Type:     schema.TypeString,
 							Required: true,
 						},
-						"duration": {
-							Type:     schema.TypeInt,
-							Optional: true,
-						},
+						// "duration": {
+						// 	Type:     schema.TypeInt,
+						// 	Optional: true,
+						// },
 						"start": {
 							Type:     schema.TypeString,
 							Optional: true,
@@ -137,9 +139,9 @@ func buildCreateTaskRequest(d *schema.ResourceData) (*wrike.CreateTaskRequest, e
 		if v, ok := dates["type"]; ok {
 			payload.Dates.Type = wrike.String(v.(string))
 		}
-		if v, ok := dates["duration"]; ok {
-			payload.Dates.Duration = wrike.Int(v.(int))
-		}
+		// if v, ok := dates["duration"]; ok {
+		// 	payload.Dates.Duration = wrike.Int(v.(int))
+		// }
 		if v, ok := dates["start"]; ok {
 			payload.Dates.Start = wrike.String(v.(string))
 		}
@@ -267,9 +269,9 @@ func applyTaskToResource(d *schema.ResourceData, task *wrike.Task) error {
 		dates := make(map[string]string)
 
 		dates["type"] = wrike.StringValue(task.Dates.Type)
-		if task.Dates.Duration != nil {
-			dates["duration"] = strconv.Itoa(wrike.IntValue(task.Dates.Duration))
-		}
+		// if task.Dates.Duration != nil {
+		// 	dates["duration"] = strconv.Itoa(wrike.IntValue(task.Dates.Duration))
+		// }
 		if task.Dates.Start != nil {
 			dates["start"] = wrike.StringValue(task.Dates.Start)
 		}
@@ -283,6 +285,9 @@ func applyTaskToResource(d *schema.ResourceData, task *wrike.Task) error {
 		d.Set("dates", dates)
 	}
 
+	if task.ParentIDs != nil {
+		d.Set("parents", task.ParentIDs)
+	}
 	if task.ResponsibleIDs != nil {
 		d.Set("responsibles", task.ResponsibleIDs)
 	}
