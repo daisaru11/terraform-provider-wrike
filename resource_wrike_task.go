@@ -334,6 +334,16 @@ func resourceTaskUpdate(d *schema.ResourceData, meta interface{}) error {
 }
 
 func resourceTaskDelete(d *schema.ResourceData, meta interface{}) error {
+	client := meta.(*wrike.Client)
+
+	id := d.Id()
+	req := &wrike.DeleteTaskRequest{
+		TaskID: wrike.String(id),
+	}
+	if _, err := client.DeleteTask(req); err != nil {
+		return fmt.Errorf("Failure on deleting task: %s", err.Error())
+	}
+
 	return nil
 }
 
