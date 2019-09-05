@@ -31,5 +31,7 @@
 /*.tfstate.*.backup
 /*.tfstate
 
+/*.tf
+
 # Bin
 /terraform-provider-wrike
