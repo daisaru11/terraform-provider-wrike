@@ -397,7 +397,7 @@ func applyTaskToResource(d *schema.ResourceData, task *wrike.Task) error {
 
 			customFields = append(customFields, field)
 		}
-		d.Set("custom_fields", task.SuperTaskIDs)
+		d.Set("custom_fields", customFields)
 	}
 	if task.CustomStatusID != nil {
 		d.Set("custom_status", wrike.StringValue(task.CustomStatusID))
