@@ -16,25 +16,25 @@ func resourceTask() *schema.Resource {
 		Delete: resourceTaskDelete,
 
 		Schema: map[string]*schema.Schema{
-			"title": &schema.Schema{
+			"title": {
 				Type:     schema.TypeString,
 				Required: true,
 			},
-			"description": &schema.Schema{
+			"description": {
 				Type:     schema.TypeString,
 				Optional: true,
 			},
-			"status": &schema.Schema{
+			"status": {
 				Type:     schema.TypeString,
 				Default:  "Active",
 				Optional: true,
 			},
-			"importance": &schema.Schema{
+			"importance": {
 				Type:     schema.TypeString,
 				Default:  "Normal",
 				Optional: true,
 			},
-			"dates": &schema.Schema{
+			"dates": {
 				Type:     schema.TypeMap,
 				Required: true,
 				Elem: &schema.Resource{
@@ -62,22 +62,22 @@ func resourceTask() *schema.Resource {
 					},
 				},
 			},
-			"parents": &schema.Schema{
+			"parents": {
 				Type:     schema.TypeSet,
 				Required: true,
 				Elem:     &schema.Schema{Type: schema.TypeString},
 			},
-			"responsibles": &schema.Schema{
+			"responsibles": {
 				Type:     schema.TypeSet,
 				Optional: true,
 				Elem:     &schema.Schema{Type: schema.TypeString},
 			},
-			"super_tasks": &schema.Schema{
+			"super_tasks": {
 				Type:     schema.TypeSet,
 				Optional: true,
 				Elem:     &schema.Schema{Type: schema.TypeString},
 			},
-			"custom_fields": &schema.Schema{
+			"custom_fields": {
 				Type:     schema.TypeList,
 				Optional: true,
 				Elem: &schema.Resource{
@@ -93,7 +93,7 @@ func resourceTask() *schema.Resource {
 					},
 				},
 			},
-			"custom_status": &schema.Schema{
+			"custom_status": {
 				Type:     schema.TypeString,
 				Optional: true,
 			},
@@ -224,6 +224,7 @@ func resourceTaskRead(d *schema.ResourceData, meta interface{}) error {
 	return applyTaskToResource(d, &res.Data[0])
 }
 
+//nolint:unparam
 func buildUpdateTaskRequest(d *schema.ResourceData) (*wrike.UpdateTaskRequest, error) {
 	payload := wrike.UpdateTaskPayload{}
 
