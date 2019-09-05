@@ -1,0 +1,30 @@
+name: Build and test Go
+on: [push, pull_request]
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go 1.12
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.12
+
+      - name: Check out source code
+        uses: actions/checkout@v1
+
+      - name: Download Go dependencies
+        env:
+          GOPROXY: "https://proxy.golang.org"
+        run: go mod download
+
+      - name: Build
+        run: go build .
+
+      - name: Test
+        run: go test -v .
+
+      - name: Lint
+        run: |
+          curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin v1.17.1
+          $(go env GOPATH)/bin/golangci-lint run
