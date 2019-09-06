@@ -35,3 +35,4 @@
 
 # Bin
 /terraform-provider-wrike
+/pkg
