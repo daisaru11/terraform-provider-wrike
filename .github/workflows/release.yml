@@ -1,0 +1,78 @@
+name: Release
+on:
+  create:
+    tags:
+      - v*.*.*
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go 1.12
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.12
+
+      - name: Check out source code
+        uses: actions/checkout@v1
+
+      - name: Download Go dependencies
+        env:
+          GOPROXY: "https://proxy.golang.org"
+        run: go mod download
+
+      - name: Lint
+        run: |
+          curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin v1.17.1
+          PATH=$PATH:$(go env GOPATH)/bin make lint
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go 1.12
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.12
+
+      - name: Check out source code
+        uses: actions/checkout@v1
+
+      - name: Download Go dependencies
+        env:
+          GOPROXY: "https://proxy.golang.org"
+        run: go mod download
+
+      - name: Test
+        run: make test
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - name: Set up Go 1.12
+        uses: actions/setup-go@v1
+        with:
+          version: 1.12
+
+      - name: Check out source code
+        uses: actions/checkout@v1
+
+      - name: Download Go dependencies
+        env:
+          GOPROXY: "https://proxy.golang.org"
+        run: go mod download
+
+      - name: Build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          export CREATE_EVENT_REF_TYPE=$(jq --raw-output .ref_type "$GITHUB_EVENT_PATH")
+          export TAGNAME=$(jq --raw-output .ref "$GITHUB_EVENT_PATH")
+          if [ "$CREATE_EVENT_REF_TYPE" != "tag" ]; then echo "ref_type is not a tag: ${CREATE_EVENT_REF_TYPE}" && exit 78; fi
+
+          make build-release-cross
+
+          go get -u github.com/tcnksm/ghr
+          $(go env GOPATH)/bin/ghr -n ${TAGNAME} -b "Release ${TAGNAME}" -draft ${TAGNAME} pkg/
